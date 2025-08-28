@@ -139,32 +139,27 @@ impl Request {
         unsafe { Pool::from_ngx_pool(self.0.pool) }
     }
 
-    /// Returns the result as an `Option` if it exists, otherwise `None`.
-    ///
-    /// The option wraps an ngx_http_upstream_t instance, it will be none when the underlying NGINX
-    /// request does not have a pointer to a [`ngx_http_upstream_t`] upstream structure.
+    /// Get the request's upstream, if it has one. None indicates the upstream
+    /// was null.
     ///
     /// [`ngx_http_upstream_t`] is best described in
     /// <https://nginx.org/en/docs/dev/development_guide.html#http_load_balancing>
-    pub fn upstream(&self) -> Option<*mut ngx_http_upstream_t> {
-        if self.0.upstream.is_null() {
-            return None;
-        }
-        Some(self.0.upstream)
+    pub fn upstream(&self) -> Option<NonNull<ngx_http_upstream_t>> {
+        NonNull::new(self.0.upstream)
     }
 
-    /// Pointer to a [`ngx_connection_t`] client connection object.
+    /// Get the request's [`ngx_connection_t`] client connection object.
     ///
     /// [`ngx_connection_t`]: https://nginx.org/en/docs/dev/development_guide.html#connection
-    pub fn connection(&self) -> *mut ngx_connection_t {
-        self.0.connection
+    pub fn connection(&self) -> NonNull<ngx_connection_t> {
+        NonNull::new(self.0.connection).expect("connection is never null")
     }
 
-    /// Pointer to a [`ngx_log_t`].
+    /// Get the request's [`ngx_log_t`] log object.
     ///
     /// [`ngx_log_t`]: https://nginx.org/en/docs/dev/development_guide.html#logging
-    pub fn log(&self) -> *mut ngx_log_t {
-        unsafe { (*self.connection()).log }
+    pub fn log(&self) -> NonNull<ngx_log_t> {
+        NonNull::new(unsafe { self.connection().as_mut() }.log).expect("log is never null")
     }
 
     /// Get Module context pointer

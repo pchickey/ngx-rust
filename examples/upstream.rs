@@ -124,6 +124,7 @@ http_upstream_init_peer_pt!(
         if hcpd.is_null() {
             return Status::NGX_ERROR;
         }
+        let hcpd = unsafe { hcpd.as_mut().expect("checked for null") };
 
         // SAFETY: this function is called with non-NULL uf always
         let us = unsafe { &mut *us };
@@ -141,20 +142,18 @@ http_upstream_init_peer_pt!(
         if maybe_upstream.is_none() {
             return Status::NGX_ERROR;
         }
-        let upstream_ptr = maybe_upstream.unwrap();
+        let upstream = unsafe { maybe_upstream.expect("checked for none").as_mut() };
 
-        unsafe {
-            (*hcpd).conf = Some(hccf);
-            (*hcpd).upstream = maybe_upstream;
-            (*hcpd).data = (*upstream_ptr).peer.data;
-            (*hcpd).client_connection = Some(request.connection());
-            (*hcpd).original_get_peer = (*upstream_ptr).peer.get;
-            (*hcpd).original_free_peer = (*upstream_ptr).peer.free;
+        hcpd.conf = Some(hccf);
+        hcpd.upstream = Some(upstream as *mut _);
+        hcpd.data = upstream.peer.data;
+        hcpd.client_connection = Some(request.connection().as_ptr());
+        hcpd.original_get_peer = upstream.peer.get;
+        hcpd.original_free_peer = upstream.peer.free;
 
-            (*upstream_ptr).peer.data = hcpd as *mut c_void;
-            (*upstream_ptr).peer.get = Some(ngx_http_upstream_get_custom_peer);
-            (*upstream_ptr).peer.free = Some(ngx_http_upstream_free_custom_peer);
-        }
+        upstream.peer.data = hcpd as *mut _ as *mut c_void;
+        upstream.peer.get = Some(ngx_http_upstream_get_custom_peer);
+        upstream.peer.free = Some(ngx_http_upstream_free_custom_peer);
 
         ngx_log_debug_http!(request, "CUSTOM UPSTREAM end request peer init");
         Status::NGX_OK

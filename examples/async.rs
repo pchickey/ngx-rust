@@ -166,8 +166,8 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
 
     let ctx = unsafe { &mut *ctx };
     ctx.event.handler = Some(check_async_work_done);
-    ctx.event.data = request.connection().cast();
-    ctx.event.log = unsafe { (*request.connection()).log };
+    ctx.event.data = request.connection().as_ptr().cast();
+    ctx.event.log = request.log().as_ptr();
     unsafe { ngx_post_event(&mut ctx.event, addr_of_mut!(ngx_posted_next_events)) };
 
     // Request is no longer needed and can be converted to something movable to the async block

@@ -128,20 +128,23 @@ unsafe fn ngx_get_origdst(
     request: &mut http::Request,
 ) -> Result<(String, in_port_t), core::Status> {
     let c = request.connection();
+    let c = unsafe { c.as_mut() };
 
-    if (*c).type_ != libc::SOCK_STREAM {
+    if c.type_ != libc::SOCK_STREAM {
         ngx_log_debug_http!(request, "httporigdst: connection is not type SOCK_STREAM");
         return Err(core::Status::NGX_DECLINED);
     }
 
-    if ngx_connection_local_sockaddr(c, std::ptr::null_mut(), 0) != core::Status::NGX_OK.into() {
+    if ngx_connection_local_sockaddr(c as *mut _, std::ptr::null_mut(), 0)
+        != core::Status::NGX_OK.into()
+    {
         ngx_log_debug_http!(request, "httporigdst: no local sockaddr from connection");
         return Err(core::Status::NGX_ERROR);
     }
 
     let level: c_int;
     let optname: c_int;
-    match (*(*c).local_sockaddr).sa_family as i32 {
+    match (*c.local_sockaddr).sa_family as i32 {
         libc::AF_INET => {
             level = libc::SOL_IP;
             optname = libc::SO_ORIGINAL_DST;
@@ -155,7 +158,7 @@ unsafe fn ngx_get_origdst(
     let mut addr: sockaddr_storage = { std::mem::zeroed() };
     let mut addrlen: libc::socklen_t = std::mem::size_of_val(&addr) as libc::socklen_t;
     let rc = libc::getsockopt(
-        (*c).fd,
+        c.fd,
         level,
         optname,
         &mut addr as *mut _ as *mut _,
